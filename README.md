@@ -1,4 +1,5 @@
 # Inoyu Apache Unomi MCP Server
+[![Trust Score](https://archestra.ai/mcp-catalog/api/badge/quality/sergehuber/inoyu-mcp-unomi-server)](https://archestra.ai/mcp-catalog/sergehuber__inoyu-mcp-unomi-server)
 
 A Model Context Protocol server enabling Claude to maintain user context through Apache Unomi profile management.
 
