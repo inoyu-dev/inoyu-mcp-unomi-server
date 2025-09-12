@@ -90,6 +90,37 @@ export interface CreateScopeArgs {
     description?: string;
 }
 
+export interface UnomiConsent {
+    id: string;
+    status: 'GRANTED' | 'DENIED' | 'PENDING';
+    timestamp: number;
+    purpose?: string;
+    scope?: string;
+    metadata?: {
+        [key: string]: any;
+    };
+}
+
+export interface UpdateConsentArgs {
+    consentId: string;
+    status: 'GRANTED' | 'DENIED' | 'REVOKED';
+    typeIdentifier?: string;
+    scope?: string;
+    metadata?: {
+        [key: string]: any;
+    };
+}
+
+export interface GetConsentArgs {
+    consentId: string;
+}
+
+export interface ListConsentsArgs {
+    profileId?: string;
+    status?: 'GRANTED' | 'DENIED' | 'REVOKED';
+    scope?: string;
+}
+
 // Type guard for get profile arguments
 export function isValidGetProfileArgs(args: any): args is GetProfileArgs {
     return (
@@ -148,6 +179,42 @@ export function isValidCreateScopeArgs(args: any): args is CreateScopeArgs {
         typeof args.scope === "string" &&
         (args.name === undefined || typeof args.name === "string") &&
         (args.description === undefined || typeof args.description === "string")
+    );
+}
+
+// Type guard for update consent arguments
+export function isValidUpdateConsentArgs(args: any): args is UpdateConsentArgs {
+    return (
+        typeof args === "object" &&
+        args !== null &&
+        "consentId" in args &&
+        typeof args.consentId === "string" &&
+        "status" in args &&
+        (args.status === "GRANTED" || args.status === "DENIED" || args.status === "REVOKED") &&
+        (args.typeIdentifier === undefined || typeof args.typeIdentifier === "string") &&
+        (args.scope === undefined || typeof args.scope === "string") &&
+        (args.metadata === undefined || typeof args.metadata === "object")
+    );
+}
+
+// Type guard for get consent arguments
+export function isValidGetConsentArgs(args: any): args is GetConsentArgs {
+    return (
+        typeof args === "object" &&
+        args !== null &&
+        "consentId" in args &&
+        typeof args.consentId === "string"
+    );
+}
+
+// Type guard for list consents arguments
+export function isValidListConsentsArgs(args: any): args is ListConsentsArgs {
+    return (
+        typeof args === "object" &&
+        args !== null &&
+        (args.profileId === undefined || typeof args.profileId === "string") &&
+        (args.status === undefined || args.status === "GRANTED" || args.status === "DENIED" || args.status === "REVOKED") &&
+        (args.scope === undefined || typeof args.scope === "string")
     );
 }
 

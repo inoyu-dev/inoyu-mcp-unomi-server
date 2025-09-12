@@ -42,6 +42,12 @@ import {
   UnomiScope,
   CreateScopeArgs,
   isValidCreateScopeArgs,
+  UpdateConsentArgs,
+  isValidUpdateConsentArgs,
+  GetConsentArgs,
+  isValidGetConsentArgs,
+  ListConsentsArgs,
+  isValidListConsentsArgs,
 } from "./types.js";
 import fs from 'fs';
 
@@ -57,6 +63,7 @@ log('MCP server started');
 dotenv.config();
 
 const UNOMI_BASE_URL = process.env.UNOMI_BASE_URL || 'http://localhost:8181';
+const UNOMI_VERSION = process.env.UNOMI_VERSION || '3'; // Default to V3
 const UNOMI_USERNAME = process.env.UNOMI_USERNAME;
 const UNOMI_PASSWORD = process.env.UNOMI_PASSWORD;
 const UNOMI_PROFILE_ID = process.env.UNOMI_PROFILE_ID;
@@ -64,12 +71,31 @@ const UNOMI_SOURCE_ID = process.env.UNOMI_SOURCE_ID || 'claude-desktop';
 const UNOMI_KEY = process.env.UNOMI_KEY;
 const UNOMI_EMAIL = process.env.UNOMI_EMAIL;
 
-if (!UNOMI_USERNAME || !UNOMI_PASSWORD) {
-  throw new Error("UNOMI_USERNAME and UNOMI_PASSWORD environment variables are required");
-}
+// V3-specific environment variables
+const UNOMI_TENANT_ID = process.env.UNOMI_TENANT_ID;
+const UNOMI_PUBLIC_KEY = process.env.UNOMI_PUBLIC_KEY;
+const UNOMI_PRIVATE_KEY = process.env.UNOMI_PRIVATE_KEY;
 
-if (!UNOMI_KEY) {
-  throw new Error("UNOMI_KEY environment variable is required for protected events");
+// Validate environment variables based on version
+if (UNOMI_VERSION === '3') {
+  // V3 requires tenant configuration
+  if (!UNOMI_TENANT_ID) {
+    throw new Error("UNOMI_TENANT_ID environment variable is required for Unomi V3");
+  }
+  if (!UNOMI_PUBLIC_KEY) {
+    throw new Error("UNOMI_PUBLIC_KEY environment variable is required for Unomi V3");
+  }
+  if (!UNOMI_PRIVATE_KEY) {
+    throw new Error("UNOMI_PRIVATE_KEY environment variable is required for Unomi V3");
+  }
+} else {
+  // V2 requires system administrator authentication
+  if (!UNOMI_USERNAME || !UNOMI_PASSWORD) {
+    throw new Error("UNOMI_USERNAME and UNOMI_PASSWORD environment variables are required for Unomi V2");
+  }
+  if (!UNOMI_KEY) {
+    throw new Error("UNOMI_KEY environment variable is required for protected events in Unomi V2");
+  }
 }
 
 if (!UNOMI_PROFILE_ID) {
@@ -78,12 +104,14 @@ if (!UNOMI_PROFILE_ID) {
 
 const API_CONFIG = {
   BASE_URL: UNOMI_BASE_URL,
+  VERSION: UNOMI_VERSION,
   ENDPOINTS: {
     PROFILE: '/cxs/profiles',
     SEARCH: '/cxs/profiles/search',
     SESSION: '/cxs/sessions',
     CONTEXT: '/context.json',
-    SCOPE: '/cxs/scopes'
+    SCOPE: '/cxs/scopes',
+    TENANTS: '/cxs/tenants'
   }
 } as const;
 
@@ -91,6 +119,7 @@ class UnomiServer {
   private server: Server;
   private axiosInstance;
   private defaultScope = 'claude-desktop';
+  private isV3: boolean;
 
   constructor() {
     this.server = new Server({
@@ -103,20 +132,63 @@ class UnomiServer {
       }
     });
 
-    // Configure axios with defaults
-    this.axiosInstance = axios.create({
-      baseURL: API_CONFIG.BASE_URL,
-      auth: {
-        username: UNOMI_USERNAME!,
-        password: UNOMI_PASSWORD!
-      },
-      headers: {
-        'X-Unomi-Peer': UNOMI_KEY
-      }
-    });
+    this.isV3 = API_CONFIG.VERSION === '3';
+
+    // Configure axios based on Unomi version
+    this.axiosInstance = this.createAxiosInstance();
 
     this.setupHandlers();
     this.setupErrorHandling();
+  }
+
+  private createAxiosInstance() {
+    const config: any = {
+      baseURL: API_CONFIG.BASE_URL
+    };
+
+    if (this.isV3) {
+      // V3: Use tenant authentication for private endpoints
+      config.auth = {
+        username: UNOMI_TENANT_ID!,
+        password: UNOMI_PRIVATE_KEY!
+      };
+    } else {
+      // V2: Use system administrator authentication
+      config.auth = {
+        username: UNOMI_USERNAME!,
+        password: UNOMI_PASSWORD!
+      };
+      config.headers = {
+        'X-Unomi-Peer': UNOMI_KEY
+      };
+    }
+
+    return axios.create(config);
+  }
+
+  private createPublicAxiosInstance() {
+    // For public endpoints in V3 (like /context.json)
+    if (this.isV3) {
+      return axios.create({
+        baseURL: API_CONFIG.BASE_URL,
+        headers: {
+          'X-Unomi-Api-Key': UNOMI_PUBLIC_KEY
+        }
+      });
+    }
+    // For V2, use the main instance
+    return this.axiosInstance;
+  }
+
+  private createSystemAdminAxiosInstance() {
+    // For system administrator operations (fallback in V3, primary in V2)
+    return axios.create({
+      baseURL: API_CONFIG.BASE_URL,
+      auth: {
+        username: UNOMI_USERNAME || 'karaf',
+        password: UNOMI_PASSWORD || 'karaf'
+      }
+    });
   }
 
   private setupErrorHandling(): void {
@@ -292,7 +364,7 @@ class UnomiServer {
           }]
         };
 
-        await this.axiosInstance.post(API_CONFIG.ENDPOINTS.CONTEXT, contextData);
+        await this.createPublicAxiosInstance().post(API_CONFIG.ENDPOINTS.CONTEXT, contextData);
       } catch (error) {
         console.error('Error setting email for new profile:', error);
       }
@@ -405,6 +477,82 @@ class UnomiServer {
               },
               required: ["query"]
             }
+          },
+          {
+            name: "get_tenant_info",
+            description: "Get information about the current tenant (V3 only)",
+            inputSchema: {
+              type: "object",
+              properties: {}
+            }
+          },
+          {
+            name: "update_consent",
+            description: "Update a user's consent status using the updateConsent event",
+            inputSchema: {
+              type: "object",
+              properties: {
+                consentId: {
+                  type: "string",
+                  description: "Unique identifier for the consent"
+                },
+                status: {
+                  type: "string",
+                  enum: ["GRANTED", "DENIED", "REVOKED"],
+                  description: "Consent status"
+                },
+                typeIdentifier: {
+                  type: "string",
+                  description: "Type identifier of the consent (optional)"
+                },
+                scope: {
+                  type: "string",
+                  description: "Scope for the consent (optional, defaults to claude-desktop)"
+                },
+                metadata: {
+                  type: "object",
+                  description: "Additional metadata for the consent (optional)",
+                  additionalProperties: true
+                }
+              },
+              required: ["consentId", "status"]
+            }
+          },
+          {
+            name: "get_consent",
+            description: "Get specific consent information for a profile",
+            inputSchema: {
+              type: "object",
+              properties: {
+                consentId: {
+                  type: "string",
+                  description: "Unique identifier for the consent"
+                }
+              },
+              required: ["consentId"]
+            }
+          },
+          {
+            name: "list_consents",
+            description: "List all consents for a profile with optional filtering",
+            inputSchema: {
+              type: "object",
+              properties: {
+                profileId: {
+                  type: "string",
+                  description: "Profile ID to list consents for (optional, uses my profile if not provided)"
+                },
+                status: {
+                  type: "string",
+                  enum: ["GRANTED", "DENIED", "REVOKED"],
+                  description: "Filter by consent status (optional)"
+                },
+                scope: {
+                  type: "string",
+                  description: "Filter by scope (optional)"
+                }
+              }
+            }
           }
         ]
       })
@@ -505,7 +653,7 @@ class UnomiServer {
                   }]
                 };
 
-                const response = await this.axiosInstance.post(
+                const response = await this.createPublicAxiosInstance().post(
                   API_CONFIG.ENDPOINTS.CONTEXT,
                   contextData
                 );
@@ -565,7 +713,7 @@ class UnomiServer {
                   requireScores: args.requireScores
                 };
 
-                const response = await this.axiosInstance.post(
+                const response = await this.createPublicAxiosInstance().post(
                   API_CONFIG.ENDPOINTS.CONTEXT,
                   contextData
                 );
@@ -686,6 +834,269 @@ class UnomiServer {
                 content: [{
                   type: "text",
                   text: JSON.stringify(response.data, null, 2)
+                }]
+              };
+            } catch (error) {
+              if (axios.isAxiosError(error)) {
+                return {
+                  content: [{
+                    type: "text",
+                    text: `Unomi API error: ${error.response?.data?.message ?? error.message}`
+                  }],
+                  isError: true,
+                };
+              }
+              throw error;
+            }
+          }
+
+          case "get_tenant_info": {
+            if (this.isV3) {
+              try {
+                const response = await this.createSystemAdminAxiosInstance().get(
+                  `${API_CONFIG.ENDPOINTS.TENANTS}/${UNOMI_TENANT_ID}`
+                );
+
+                return {
+                  content: [{
+                    type: "text",
+                    text: JSON.stringify({
+                      tenant: response.data,
+                      version: "V3",
+                      tenantId: UNOMI_TENANT_ID,
+                      hasPublicKey: !!UNOMI_PUBLIC_KEY,
+                      hasPrivateKey: !!UNOMI_PRIVATE_KEY
+                    }, null, 2)
+                  }]
+                };
+              } catch (error) {
+                if (axios.isAxiosError(error)) {
+                  return {
+                    content: [{
+                      type: "text",
+                      text: `Unomi API error: ${error.response?.data?.message ?? error.message}`
+                    }],
+                    isError: true,
+                  };
+                }
+                throw error;
+              }
+            } else {
+              return {
+                content: [{
+                  type: "text",
+                  text: JSON.stringify({
+                    message: "Tenant information is only available in Unomi V3",
+                    version: "V2",
+                    suggestion: "Upgrade to Unomi V3 or set UNOMI_VERSION=3 to enable tenant features"
+                  }, null, 2)
+                }]
+              };
+            }
+          }
+
+          case "update_consent": {
+            await this.ensureScopeExists();
+
+            if (!isValidUpdateConsentArgs(request.params.arguments)) {
+              throw new McpError(
+                ErrorCode.InvalidParams,
+                "Invalid update consent arguments"
+              );
+            }
+
+            const args = request.params.arguments;
+            return this.handleMyProfileOperation(async (profileId, args) => {
+              try {
+                const sessionId = generateSessionId(profileId);
+                const scope = args.scope || this.defaultScope;
+                
+                const contextData: UnomiContext = {
+                  sessionId,
+                  profileId,
+                  source: {
+                    itemId: UNOMI_SOURCE_ID,
+                    itemType: "claude",
+                    scope: scope
+                  },
+                  events: [{
+                    itemId: `consent-${args.consentId}-${Date.now()}`,
+                    itemType: "event",
+                    eventType: "modifyConsent",
+                    scope: scope,
+                    sessionId: sessionId,
+                    profileId: profileId,
+                    timeStamp: new Date().toISOString(),
+                    source: {
+                      itemId: UNOMI_SOURCE_ID,
+                      itemType: "claude",
+                      scope: scope
+                    },
+                    target: {
+                      itemId: profileId,
+                      itemType: "profile",
+                      scope: scope
+                    },
+                    properties: {
+                      consent: {
+                        scope: scope,
+                        typeIdentifier: args.typeIdentifier || args.consentId,
+                        status: args.status,
+                        statusDate: new Date().toISOString(),
+                        revokeDate: (() => {
+                          const now = new Date();
+                          if (args.status === "GRANTED") {
+                            // GDPR recommendation: consent expires after 1 year
+                            const oneYearFromNow = new Date(now.getTime() + (365 * 24 * 60 * 60 * 1000));
+                            return oneYearFromNow.toISOString();
+                          } else if (args.status === "DENIED" || args.status === "REVOKED") {
+                            // Denied/revoked consents expire immediately
+                            return now.toISOString();
+                          }
+                          return now.toISOString(); // fallback
+                        })()
+                      }
+                    }
+                  }]
+                };
+
+                const response = await this.createPublicAxiosInstance().post(
+                  API_CONFIG.ENDPOINTS.CONTEXT,
+                  contextData
+                );
+
+                return {
+                  content: [{
+                    type: "text",
+                    text: JSON.stringify({
+                      message: "Consent updated successfully",
+                      consentId: args.consentId,
+                      status: args.status,
+                      typeIdentifier: args.typeIdentifier,
+                      scope: scope,
+                      profileId: profileId,
+                      sessionId: sessionId,
+                      source: UNOMI_EMAIL ? "email_lookup" : "environment"
+                    }, null, 2)
+                  }]
+                };
+              } catch (error) {
+                if (axios.isAxiosError(error)) {
+                  return {
+                    content: [{
+                      type: "text",
+                      text: `Unomi API error: ${error.response?.data?.message ?? error.message}`
+                    }],
+                    isError: true,
+                  };
+                }
+                throw error;
+              }
+            }, args);
+          }
+
+          case "get_consent": {
+            if (!isValidGetConsentArgs(request.params.arguments)) {
+              throw new McpError(
+                ErrorCode.InvalidParams,
+                "Invalid get consent arguments"
+              );
+            }
+
+            const args = request.params.arguments;
+            return this.handleMyProfileOperation(async (profileId, args) => {
+              try {
+                // Get the full profile to access consents
+                const response = await this.axiosInstance.get<UnomiProfile>(
+                  `${API_CONFIG.ENDPOINTS.PROFILE}/${profileId}`
+                );
+
+                const consents = response.data.consents || {};
+                const consent = consents[args.consentId];
+
+                if (!consent) {
+                  return {
+                    content: [{
+                      type: "text",
+                      text: JSON.stringify({
+                        message: "Consent not found",
+                        consentId: args.consentId,
+                        profileId: profileId
+                      }, null, 2)
+                    }]
+                  };
+                }
+
+                return {
+                  content: [{
+                    type: "text",
+                    text: JSON.stringify({
+                      consentId: args.consentId,
+                      consent: consent,
+                      profileId: profileId,
+                      source: UNOMI_EMAIL ? "email_lookup" : "environment"
+                    }, null, 2)
+                  }]
+                };
+              } catch (error) {
+                if (axios.isAxiosError(error)) {
+                  return {
+                    content: [{
+                      type: "text",
+                      text: `Unomi API error: ${error.response?.data?.message ?? error.message}`
+                    }],
+                    isError: true,
+                  };
+                }
+                throw error;
+              }
+            }, args);
+          }
+
+          case "list_consents": {
+            if (!isValidListConsentsArgs(request.params.arguments)) {
+              throw new McpError(
+                ErrorCode.InvalidParams,
+                "Invalid list consents arguments"
+              );
+            }
+
+            const args = request.params.arguments;
+            const targetProfileId = args.profileId || await this.getEffectiveProfileId();
+            
+            try {
+              // Get the full profile to access consents
+              const response = await this.axiosInstance.get<UnomiProfile>(
+                `${API_CONFIG.ENDPOINTS.PROFILE}/${targetProfileId}`
+              );
+
+              const consents = response.data.consents || {};
+              let filteredConsents = Object.entries(consents).map(([consentId, consent]) => ({
+                consentId,
+                ...consent
+              }));
+
+              // Apply filters
+              if (args.status) {
+                filteredConsents = filteredConsents.filter(consent => consent.status === args.status);
+              }
+              if (args.scope) {
+                filteredConsents = filteredConsents.filter(consent => (consent as any).scope === args.scope);
+              }
+
+              return {
+                content: [{
+                  type: "text",
+                  text: JSON.stringify({
+                    consents: filteredConsents,
+                    totalCount: filteredConsents.length,
+                    profileId: targetProfileId,
+                    filters: {
+                      status: args.status,
+                      scope: args.scope
+                    },
+                    source: args.profileId ? "provided" : (UNOMI_EMAIL ? "email_lookup" : "environment")
+                  }, null, 2)
                 }]
               };
             } catch (error) {

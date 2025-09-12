@@ -41,12 +41,16 @@ On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
       "args": ["@inoyu/mcp-unomi-server"],
       "env": {
         "UNOMI_BASE_URL": "http://your-unomi-server:8181",
-        "UNOMI_USERNAME": "your-username", // by default Apache Unomi uses karaf  
-        "UNOMI_PASSWORD": "your-password", // by default Apache Unomi uses karaf
+        "UNOMI_VERSION": "3", // Use "2" for Unomi V2, "3" for Unomi V3 (default)
+        "UNOMI_USERNAME": "your-username", // Required for V2, fallback for V3
+        "UNOMI_PASSWORD": "your-password", // Required for V2, fallback for V3
         "UNOMI_PROFILE_ID": "your-profile-id",
-        "UNOMI_KEY": "your-unomi-key", // by default Apache Unomi uses 670c26d1cc413346c3b2fd9ce65dab41
+        "UNOMI_KEY": "your-unomi-key", // Required for V2 only
         "UNOMI_EMAIL": "your-email@example.com",
-        "UNOMI_SOURCE_ID": "claude-desktop"
+        "UNOMI_SOURCE_ID": "claude-desktop",
+        "UNOMI_TENANT_ID": "your-tenant-id", // Required for V3
+        "UNOMI_PUBLIC_KEY": "your-public-key", // Required for V3
+        "UNOMI_PRIVATE_KEY": "your-private-key" // Required for V3
       }
     }
   }
@@ -104,6 +108,62 @@ Make sure to restart Claude Desktop after updating the configuration. You can th
       "description": "Scope for my application events"
     }
     ```
+- `get_tenant_info` - Get information about the current tenant (V3 only)
+  - Returns tenant details, version information, and key status
+  - Only available when using Unomi V3
+  - No parameters required
+
+### Consent Management Tools
+- `update_consent` - Update a user's consent status using the modifyConsent event
+  - Uses the Apache Unomi Consent API as described in the [official documentation](https://unomi.apache.org/manual/latest/#_consent_api)
+  - Required parameters:
+    - consentId: Unique identifier for the consent
+    - status: Consent status (GRANTED, DENIED, or REVOKED)
+  - Optional parameters:
+    - typeIdentifier: Type identifier of the consent
+    - scope: Scope for the consent (defaults to claude-desktop)
+    - metadata: Additional metadata for the consent
+  - GDPR Compliance: 
+    - GRANTED consents expire after 1 year (GDPR recommendation)
+    - DENIED/REVOKED consents expire immediately
+  - Example:
+    ```json
+    {
+      "consentId": "marketing-consent",
+      "status": "GRANTED",
+      "typeIdentifier": "marketing",
+      "scope": "claude-desktop",
+      "metadata": {
+        "source": "claude-desktop",
+        "timestamp": "2024-01-15T10:30:00Z"
+      }
+    }
+    ```
+
+- `get_consent` - Get specific consent information for a profile
+  - Takes consentId as required parameter
+  - Returns consent details including status, timestamp, and metadata
+  - Uses your profile by default (from environment or email lookup)
+  - Example:
+    ```json
+    {
+      "consentId": "marketing-consent"
+    }
+    ```
+
+- `list_consents` - List all consents for a profile with optional filtering
+  - Optional parameters:
+    - profileId: Profile ID to list consents for (uses your profile if not provided)
+    - status: Filter by consent status (GRANTED, DENIED, or REVOKED)
+    - scope: Filter by scope
+  - Returns filtered list of consents with metadata
+  - Example:
+    ```json
+    {
+      "status": "GRANTED",
+      "scope": "claude-desktop"
+    }
+    ```
 
 ### Scope Management
 The server automatically manages scopes for you:
@@ -125,6 +185,51 @@ The server automatically manages scopes for you:
 
 > **Note**: While scopes are created automatically when needed, you can still create them manually with custom names and descriptions using the `create_scope` tool.
 
+## Apache Unomi V2/V3 Compatibility
+
+This MCP server supports both Apache Unomi V2 and V3 with automatic version detection and appropriate authentication methods.
+
+### Version Detection
+
+The server automatically detects the Unomi version based on the `UNOMI_VERSION` environment variable:
+- `UNOMI_VERSION=2` - Uses V2 authentication (system administrator)
+- `UNOMI_VERSION=3` - Uses V3 authentication (tenant-based) - **Default**
+
+### V2 vs V3 Authentication
+
+**V2 (Legacy):**
+- Uses system administrator authentication (`karaf/karaf` by default)
+- All operations use the same authentication method
+- Requires `UNOMI_USERNAME`, `UNOMI_PASSWORD`, and `UNOMI_KEY`
+
+**V3 (Multi-tenant):**
+- Uses tenant-based authentication with API keys
+- Different authentication for different endpoint types:
+  - **Public endpoints** (`/context.json`): Uses `X-Unomi-Api-Key` header with public key
+  - **Private endpoints** (profiles, scopes): Uses tenant authentication (`tenantId:privateKey`)
+  - **System operations**: Falls back to system administrator authentication
+- Requires `UNOMI_TENANT_ID`, `UNOMI_PUBLIC_KEY`, and `UNOMI_PRIVATE_KEY`
+
+### Migration from V2 to V3
+
+1. **Update environment variables:**
+   ```bash
+   # Remove V2-specific variables
+   # UNOMI_KEY (no longer needed)
+   
+   # Add V3-specific variables
+   UNOMI_VERSION=3
+   UNOMI_TENANT_ID=your-tenant-id
+   UNOMI_PUBLIC_KEY=your-public-key
+   UNOMI_PRIVATE_KEY=your-private-key
+   ```
+
+2. **Benefits of V3:**
+   - Complete data isolation between tenants
+   - Enhanced security with tenant-specific API keys
+   - Better scalability for multi-tenant deployments
+   - Improved compliance with data privacy regulations
+
 ## Overview
 
 This MCP server enables Claude to maintain context about users through Apache Unomi's profile management system. Here's what you can achieve with it:
@@ -137,8 +242,17 @@ This MCP server enables Claude to maintain context about users through Apache Un
 
 2. **Context Management**:
    - Store and retrieve user preferences
+   - Manage user consent preferences
+   - Track consent status and history
 
-3. **Integration Features**:
+3. **Consent Management**:
+   - Update user consent status using Apache Unomi's Consent API
+   - Retrieve specific consent information
+   - List and filter consents by status and scope
+   - Automatic consent expiration handling (GDPR compliant)
+   - Support for GDPR and privacy compliance
+
+4. **Integration Features**:
    - Seamless Claude Desktop integration
    - Automatic session management
    - Scope-based context isolation
@@ -148,6 +262,10 @@ This MCP server enables Claude to maintain context about users through Apache Un
 - Store and retrieve user-specific information
 - Maintain consistent user context
 - Manage multiple users through email identification
+- Track and manage user consent preferences
+- Comply with privacy regulations (GDPR, CCPA, etc.)
+- Update consent status in real-time
+- Query consent history and status
 
 ### Prerequisites
 - Running Apache Unomi server
