@@ -1,0 +1,40 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+
+startCommand:
+  type: stdio
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    type: object
+    required:
+      - unomiBaseUrl
+      - unomiUsername
+      - unomiPassword
+      - unomiProfileId
+      - unomiKey
+      - unomiEmail
+    properties:
+      unomiBaseUrl:
+        type: string
+        description: Base URL for the Apache Unomi server.
+      unomiUsername:
+        type: string
+        description: Username for authenticating with the Unomi server.
+      unomiPassword:
+        type: string
+        description: Password for authenticating with the Unomi server.
+      unomiProfileId:
+        type: string
+        description: Profile ID for the Unomi server.
+      unomiSourceId:
+        type: string
+        description: Source ID for the Unomi server.
+      unomiKey:
+        type: string
+        description: Key for accessing protected events on the Unomi server.
+      unomiEmail:
+        type: string
+        description: Email used for profile lookup on the Unomi server.
+  commandFunction:
+    # A function that produces the CLI command to start the MCP on stdio.
+    |-
+    (config) => ({ command: 'node', args: ['build/index.js'], env: { UNOMI_BASE_URL: config.unomiBaseUrl, UNOMI_USERNAME: config.unomiUsername, UNOMI_PASSWORD: config.unomiPassword, UNOMI_PROFILE_ID: config.unomiProfileId, UNOMI_SOURCE_ID: config.unomiSourceId, UNOMI_KEY: config.unomiKey, UNOMI_EMAIL: config.unomiEmail }})

@@ -1,5 +1,7 @@
 # Inoyu Apache Unomi MCP Server
 
+[![smithery badge](https://smithery.ai/badge/@inoyu/mcp-unomi-server)](https://smithery.ai/server/@inoyu/mcp-unomi-server)
+
 A Model Context Protocol server enabling Claude to maintain user context through Apache Unomi profile management.
 
 > ⚠️ **Early Implementation Notice**
@@ -28,6 +30,15 @@ Watch how the MCP server enables Claude to maintain context and manage user prof
 
 ## Installation
 
+### Installing via Smithery
+
+To install Inoyu Apache Unomi Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@inoyu/mcp-unomi-server):
+
+```bash
+npx -y @smithery/cli install @inoyu/mcp-unomi-server --client claude
+```
+
+### Installing Manually
 To use with Claude Desktop, add the server config and environment variables:
 
 On MacOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
