@@ -26,6 +26,10 @@ Watch how the MCP server enables Claude to maintain context and manage user prof
 
 [![Apache Unomi MCP Server Demo](https://img.youtube.com/vi/YqPkUhBlcrs/0.jpg)](https://www.youtube.com/watch?v=YqPkUhBlcrs)
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/sergehuber-inoyu-mcp-unomi-server).
+
 ## Installation
 
 To use with Claude Desktop, add the server config and environment variables:
