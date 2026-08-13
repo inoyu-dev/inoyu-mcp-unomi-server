@@ -290,6 +290,13 @@ UNOMI_KEY=your-unomi-key
 UNOMI_EMAIL=your-email
 ```
 
+Optional:
+
+```bash
+# Where the server writes its debug log. Defaults to <os-temp-dir>/unomi-mcp-server.log.
+UNOMI_LOG_FILE=/path/to/unomi-mcp-server.log
+```
+
 ### Profile Resolution
 
 The server uses a two-step process to resolve the profile ID:
@@ -344,6 +351,13 @@ UNOMI_PROFILE_ID=your-profile-id
 UNOMI_SOURCE_ID=your-source-id
 UNOMI_KEY=your-unomi-key
 UNOMI_EMAIL=your-email
+```
+
+Optional:
+
+```bash
+# Where the server writes its debug log. Defaults to <os-temp-dir>/unomi-mcp-server.log.
+UNOMI_LOG_FILE=/path/to/unomi-mcp-server.log
 ```
 
 ### Profile Resolution

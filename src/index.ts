@@ -50,11 +50,22 @@ import {
   isValidListConsentsArgs,
 } from "./types.js";
 import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
-// Create a simple logging function
+// Create a simple logging function.
+// The log file location is configurable via the UNOMI_LOG_FILE env var and
+// defaults to the OS temp directory, so it works on any machine. (Previously a
+// hardcoded absolute path caused appendFileSync to throw ENOENT and crash the
+// server on startup on every machine but the original author's.)
+const LOG_FILE = process.env.UNOMI_LOG_FILE || path.join(os.tmpdir(), 'unomi-mcp-server.log');
 function log(message: string) {
-    const timestamp = new Date().toISOString();
-    fs.appendFileSync('/Users/loom/temp/mcp-server.log', `${timestamp}: ${message}\n`);
+    try {
+        const timestamp = new Date().toISOString();
+        fs.appendFileSync(LOG_FILE, `${timestamp}: ${message}\n`);
+    } catch {
+        // Logging must never take down the MCP server.
+    }
 }
 
 // Use it in your code
