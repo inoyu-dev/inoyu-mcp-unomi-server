@@ -388,6 +388,8 @@ The response will indicate which method was used via the `source` field:
 
 ## Development
 
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and sign the [Contributor License Agreement](CLA.md) before a pull request is merged.
+
 Install dependencies:
 ```bash
 npm install
