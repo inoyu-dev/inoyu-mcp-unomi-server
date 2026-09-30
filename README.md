@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/sergehuber-inoyu-mcp-unomi-server-badge.png)](https://mseep.ai/app/sergehuber-inoyu-mcp-unomi-server)
+
 # Inoyu Apache Unomi MCP Server
 
 A Model Context Protocol server enabling Claude to maintain user context through Apache Unomi profile management.
