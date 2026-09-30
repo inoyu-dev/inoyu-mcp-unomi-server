@@ -1,8 +1,6 @@
 # Individual Contributor License Agreement ("Agreement") V2.2
 
-You accept this Agreement by posting the following statement, on its own, as a comment on the pull request:
-
-> I have read the CLA Document and I hereby sign the CLA
+You accept this Agreement by signing it with your GitHub account through [CLA assistant](https://cla-assistant.io/) from the pull request.
 
 ## Diff against the Apache ICLA V2.2
 
@@ -27,7 +25,7 @@ Where that text says `The Apache Software Foundation (the "Foundation")` or `the
 -(optional) preferred Apache id(s):
 -(optional) notify project:
 -The starred fields above will become part of your public profile.
-+You accept this Agreement by posting the following statement, on its own, as a comment on the pull request: I have read the CLA Document and I hereby sign the CLA
++You accept this Agreement by signing it with your GitHub account through CLA assistant from the pull request.
 
  You accept and agree to the following terms and conditions for Your Contributions (present and future) that you submit to the Foundation.
 -In return, the Foundation shall not use Your Contributions in a way that is contrary to the public benefit or inconsistent with its nonprofit status and bylaws in effect at the time of the Contribution.
