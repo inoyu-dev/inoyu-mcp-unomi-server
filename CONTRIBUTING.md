@@ -2,7 +2,7 @@
 
 Thank you for contributing to the Inoyu Apache Unomi MCP server.
 
-External contributions are accepted only after the author signs the [Inoyu Individual Contributor License Agreement](CLA.md). The agreement gives Inoyu Sàrl a perpetual license to use the contribution in this open source project and in Inoyu products, including under commercial terms. You keep the copyright in your work.
+External contributions are accepted only after the author signs the [Individual Contributor License Agreement](CLA.md). It is the Apache Software Foundation [ICLA V2.2](https://www.apache.org/licenses/icla.pdf), with Inoyu Sàrl as the licensee. The diff against that text is at the top of the agreement. You keep the copyright in your work and may use it for any other purpose. Inoyu, and anyone who receives software Inoyu distributes, receives the same copyright and patent license the ASF asks for.
 
 ## Sign the agreement
 
